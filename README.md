@@ -1,4 +1,6 @@
 # Neural network C++ Library
+
+made it possible to build with Visual Studio 2012
 ----
 Library of relation with artificial neural network written by C++. There are 6 types of layers, FullyConnected, SparseFullyConnected, DropoutFullyConnected, KDropoutFullyConnected, Convolutional and Max-Pooling. I introduce these layers in below.
 This library is released under the MIT License, for more details see a file LICENSE.

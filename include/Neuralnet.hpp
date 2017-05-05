@@ -9,6 +9,8 @@
 #include <memory>
 #include <random>
 
+#include <numeric>
+
 #ifdef DEBUG
 #include <chrono>
 #endif
@@ -27,9 +29,20 @@ private:
 	typedef Matrix<double> Mat;
 	typedef std::vector<double> Vec;
 
-	const double adam_beta = 0.9, adam_gamma = 0.999, adam_eps = 1.0E-8;
+	double adam_beta, adam_gamma, adam_eps;
 	std::vector<std::vector<std::vector<Mat>>> adam_v, adam_r;
-	double adam_beta_ = 1.0, adam_gamma_ = 1.0;
+	double adam_beta_, adam_gamma_;
+
+	// Kingma, Diederik, and Jimmy Ba. "Adam: A method for stochastic optimization." arXiv preprint arXiv:1412.6980 (2014).00
+	inline void _init()
+	{
+		//ò_ï∂ì‡Ç≈êÑèßÇ≥ÇÍÇƒÇ¢ÇÈíl
+		adam_beta = 0.9;
+		adam_gamma = 0.999;
+		adam_eps = 1.0E-8;
+		adam_beta_ = 1.0;
+		adam_gamma_ = 1.0;
+	}
 
 	int BATCH_SIZE, UPDATE_ITER;
 	double EPS, LAMBDA;
@@ -90,12 +103,18 @@ std::vector<std::vector<std::vector<Neuralnet::Mat>>> Neuralnet::calc_gradient (
 	const int num_layer = layer.size();
 	
 	std::vector<Mat> delta(d.size());
-	for( int i = 0; i < d.size(); ++i ) delta[i] = Mat(d[i].m, d[i].n);
 
-	std::shared_ptr<Function> f = layer[num_layer-1]->get_function();
-	for( int i = 0; i < d.size(); ++i )
-		delta[i] = Mat::hadamard((*loss)((*f)(U[num_layer][i], false), d[i], true),
-								 (*f)(U[num_layer][i], true));
+#pragma omp parallel	 // @@@ add
+	{
+#pragma omp for    // @@@ add
+		for (int i = 0; i < d.size(); ++i) delta[i] = Mat(d[i].m, d[i].n);
+
+		std::shared_ptr<Function> f = layer[num_layer - 1]->get_function();
+#pragma omp for    // @@@ add
+		for (int i = 0; i < d.size(); ++i)
+			delta[i] = Mat::hadamard((*loss)((*f)(U[num_layer][i], false), d[i], true),
+			(*f)(U[num_layer][i], true));
+	}
 
 #ifdef DEBUG
 	int rank = 0;
@@ -204,6 +223,7 @@ void Neuralnet::check_gradient ( int cnt, const std::vector<int>& idx, const std
 Neuralnet::Neuralnet( const std::shared_ptr<LossFunction>& loss )
 	:EPS(1.0E-3), LAMBDA(0.0), BATCH_SIZE(1), UPDATE_ITER(-1), loss(loss)
 {
+	_init();
 	mt = std::mt19937(time(NULL));
 }
 
@@ -211,6 +231,7 @@ Neuralnet::Neuralnet( const std::shared_ptr<LossFunction>& loss )
 Neuralnet::Neuralnet( const std::shared_ptr<LossFunction>& loss, MPI_Comm outer_world, MPI_Comm inner_world )
 	:EPS(1.0E-3), LAMBDA(0.0), BATCH_SIZE(1), UPDATE_ITER(-1), loss(loss), outer_world(outer_world), inner_world(inner_world)
 {
+	_init();
 	int rank = 0, seed;
 	MPI_Comm_rank(outer_world, &rank);
 
@@ -263,10 +284,10 @@ void Neuralnet::add_layer( const std::shared_ptr<Layer>& layer )
 		if( rank == 0 ){
 			if( layer->get_prev_num_map() != prev_num_map )
 				printf("WARNING : Wrong prev_num_map on layer %lu.\n  Estimate prev_num_map = %d.\n",
-					   this->layer.size() + 1, prev_num_map);
+					   (int)this->layer.size() + 1, prev_num_map);
 			if( layer->get_prev_num_unit() != prev_num_unit )
 				printf("WARNING : Wrong prev_num_unit on layer %lu.\n  Estimate prev_num_unit = %d.\n",
-					   this->layer.size() + 1, prev_num_unit);
+					   (int)this->layer.size() + 1, prev_num_unit);
 		}
 	}
 	
@@ -336,9 +357,12 @@ void Neuralnet::learning ( const std::vector<Mat>& X, const std::vector<Mat>& Y,
 						   const std::function<void(Neuralnet&, const int, const std::vector<Mat>&, const std::vector<Mat>&)>& each_func )
 {
 	int nprocs = 1, myrank = 0;
+	int world_rank = 0;			//@@@ add
 #ifdef USE_MPI
 	MPI_Comm_rank(inner_world, &myrank);
 	MPI_Comm_size(inner_world, &nprocs);
+
+	MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);	//@@@ add
 #endif
 
 	const int num_layer = layer.size();
@@ -363,10 +387,14 @@ void Neuralnet::learning ( const std::vector<Mat>& X, const std::vector<Mat>& Y,
 		U[i+1] = std::vector<Mat>(layer[i]->get_num_map(), Mat(layer[i]->get_num_unit(), BATCH_SIZE));
 	}
 
+	for( int i = 0; i < num_layer; ++i ) layer[i]->set_is_learning(false);
 	each_func(*this, 0, U[0], D);
 
 	int cnt = 0;
 	for( int n = 0; n < MAX_ITER; ++n ){
+		for( int i = 0; i < num_layer; ++i ) layer[i]->set_is_learning(true);
+		
+		//if (world_rank == 0 && n % 10 == 0)fprintf(stderr, "iter:%d/%d %.2f%%\n", n, MAX_ITER-1, 100.0*(double)n/(double)(MAX_ITER-1)); fflush(stderr);
 #ifdef DEBUG
 		auto beg = std::chrono::system_clock::now();
 #endif
@@ -432,11 +460,13 @@ void Neuralnet::learning ( const std::vector<Mat>& X, const std::vector<Mat>& Y,
 #ifdef DEBUG
 		beg = std::chrono::system_clock::now();
 #endif
+		const double inv_BATCH_SIZE = 1.0 / BATCH_SIZE;	//@@@ add
 		// averaging all gradients of weights of mini-batches
-		for( int i = 0; i < nabla_w.size(); ++i )
-			for( int j = 0; j < nabla_w[i].size(); ++j )
-				for( int k = 0; k < nabla_w[i][j].size(); ++k )
-					nabla_w[i][j][k] *= 1.0/BATCH_SIZE;
+#pragma omp parallel for //@@@ add
+		for (int i = 0; i < nabla_w.size(); ++i)
+			for (int j = 0; j < nabla_w[i].size(); ++j)
+				for (int k = 0; k < nabla_w[i][j].size(); ++k)
+					nabla_w[i][j][k] *= inv_BATCH_SIZE;		//@@ org-> 1.0 / BATCH_SIZE;
 		
 #ifdef CHECK_GRAD
 		check_gradient(cnt, idx, X, Y, nabla_w);
@@ -513,6 +543,7 @@ void Neuralnet::learning ( const std::vector<Mat>& X, const std::vector<Mat>& Y,
 		if( myrank == 0 ) printf("Averaging : %3lld\n", std::chrono::duration_cast<std::chrono::milliseconds>(end - beg).count());
 #endif
 
+		for( int i = 0; i < num_layer; ++i ) layer[i]->set_is_learning(false);
 		each_func(*this, n+1, U[0], D);
 	}
 
@@ -536,6 +567,7 @@ std::vector<std::vector<Neuralnet::Vec>> Neuralnet::apply ( const std::vector<st
 {
 	std::vector<Mat> u(x[0].size());
 	for( int i = 0; i < x[0].size(); ++i ) u[i] = Mat(x[0][0].size(), x.size());
+#pragma omp parallel for //@@@ add
 	for( int i = 0; i < x.size(); ++i )
 		for( int j = 0; j < x[0].size(); ++j )
 			for( int k = 0; k < x[0][0].size(); ++k )
@@ -544,6 +576,7 @@ std::vector<std::vector<Neuralnet::Vec>> Neuralnet::apply ( const std::vector<st
 	u = apply(u);
 
 	std::vector<std::vector<Vec>> ret(u[0].n);
+#pragma omp parallel for //@@@ add
 	for( int i = 0; i < u[0].n; ++i ){
 		ret[i] = std::vector<Vec>(u.size(), Vec(u[0].m));
 		for( int j = 0; j < u.size(); ++j )

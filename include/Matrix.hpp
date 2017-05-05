@@ -41,8 +41,8 @@ struct Matrix
 	T* v;
 #endif
 	
-	Matrix(): m(0), n(0), v(NULL) { }
-	Matrix( const int& m, const int& n ) :m(m), n(n)
+	inline Matrix(): m(0), n(0), v(NULL) { }
+	inline Matrix( const int& m, const int& n ) :m(m), n(n)
 	{
 #ifdef USE_EIGEN
 		v = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(m, n);
@@ -70,7 +70,7 @@ struct Matrix
 	Matrix( const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& A ) :v(A), m(A.rows()), n(A.cols()) {}
 #endif
 
-	Matrix( const Matrix<T>& mat )
+	inline Matrix( const Matrix<T>& mat )
 	{
 		m = mat.m; n = mat.n;
 		if( m == 0 || n == 0 ){
@@ -78,8 +78,9 @@ struct Matrix
 		}
 		else{
 			v = new T[m*n];
+			const int mn = m*n;
 #pragma omp parallel for
-			for( int i = 0; i < m*n; ++i )  v[i] = mat.v[i];
+			for( int i = 0; i < mn; ++i )  v[i] = mat.v[i];
 		}
 	}
 
@@ -94,8 +95,9 @@ struct Matrix
 		}
 			
 		v = new T[m*n];
+		const int mn = m*n;
 #pragma omp parallel for
-		for( int i = 0; i < m*n; ++i )  v[i] = mat.v[i];
+		for( int i = 0; i < mn; ++i )  v[i] = mat.v[i];
 
 		return *this;
 	}
@@ -116,16 +118,18 @@ struct Matrix
 	static Matrix<T> ones ( const int& m, const int& n )
 	{
 		Matrix<T> ret(m, n);
+		const int mn = m*n;
 #pragma omp parallel for
-		for( int i = 0; i < m*n; ++i ) ret.v[i] = 1.0;
+		for( int i = 0; i < mn; ++i ) ret.v[i] = 1.0;
 		return ret;
 	}
 
 	static Matrix<T> zeros ( const int& m, const int& n )
 	{
 		Matrix<T> ret(m, n);
+		const int mn = m*n;
 #pragma omp parallel for
-		for( int i = 0; i < m*n; ++i ) ret.v[i] = 0.0;
+		for( int i = 0; i < mn; ++i ) ret.v[i] = 0.0;
 		return ret;
 	}
 
@@ -160,18 +164,19 @@ struct Matrix
 		int m = mat.m, n = mat.n;
 		T ret = 0.0;
 
+		const int mn = m*n;
 #pragma omp parallel for reduction(+:ret)
-		for( int i = 0; i < m*n; ++i ) ret += mat.v[i]*mat.v[i];
+		for( int i = 0; i < mn; ++i ) ret += mat.v[i]*mat.v[i];
 
 		return sqrt(ret);
 	}
 
 	void apply ( const std::function<double(const double&)>& func )
 	{
+		const int mn = m*n;
 #pragma omp parallel for
-		for( int i = 0; i < m*n; ++i ) this->v[i] = func(this->v[i]);
+		for( int i = 0; i < mn; ++i ) this->v[i] = func(this->v[i]);
 	}
-	
 	inline const T& operator () ( int i, int j ) const
 	{
 #ifdef USE_EIGEN
@@ -214,8 +219,9 @@ struct Matrix
 #ifdef USE_EIGEN
 		this->v -= m1.v;
 #else
+		const int mn = m*n;
 #pragma omp parallel for
-		for( int i = 0; i < m*n; ++i ) this->v[i] -= m1.v[i];
+		for( int i = 0; i < mn; ++i ) this->v[i] -= m1.v[i];
 #endif
 		cnt_flop += (long long)m*n;
 
@@ -260,8 +266,9 @@ struct Matrix
 #ifdef USE_EIGEN
 		this->v /= c;
 #else
+		const int mn = m*n;
 #pragma omp parallel for
-		for( int i = 0; i < m*n; ++i ) this->v[i] /= c;
+		for( int i = 0; i < mn; ++i ) this->v[i] /= c;
 #endif
 		cnt_flop += (long long)this->m*this->n;
 
@@ -291,8 +298,9 @@ struct Matrix
 #ifdef USE_EIGEN
 		ret.v = m1.v - m2.v;
 #else
+		const int mn = m*n;
 #pragma omp parallel for
-		for( int i = 0; i < m*n; ++i ) ret.v[i] = m1.v[i] - m2.v[i];
+		for( int i = 0; i < mn; ++i ) ret.v[i] = m1.v[i] - m2.v[i];
 #endif
 		cnt_flop += (long long)m*n;
 

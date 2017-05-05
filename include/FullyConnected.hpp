@@ -114,6 +114,7 @@ std::vector<std::vector<FullyConnected::Mat>> FullyConnected::calc_gradient ( co
 	std::vector<std::vector<Mat>> nabla(num_map);
 	for( int i = 0; i < num_map; ++i ){
 		nabla[i] = std::vector<Mat>(prev_num_map);
+#pragma omp parallel for    // @@@ add
 		for( int j = 0; j < prev_num_map; ++j )
 			nabla[i][j] = Mat(W[i][j].m, W[i][j].n);
 	}
@@ -185,6 +186,7 @@ std::vector<FullyConnected::Mat> FullyConnected::calc_delta ( const std::vector<
 	t_delta_repl += std::chrono::duration_cast<std::chrono::nanoseconds>(end - beg).count()/1e9;
 
 	beg = std::chrono::system_clock::now();
+#pragma omp parallel for //@@@ add
 	for( int i = 0; i < prev_num_map; ++i ){
 		tmp[i] = Mat::zeros(W[0][0].n, tmp_delta[0].n);
 		if( W[0][0].m != 0 )
@@ -233,6 +235,7 @@ std::vector<FullyConnected::Mat> FullyConnected::calc_delta ( const std::vector<
 
 void FullyConnected::update_W ( const std::vector<std::vector<Mat>>& dW )
 {
+#pragma omp parallel for //@@@ add
 	for( int i = 0; i < num_map; ++i )
 		for( int j = 0; j < prev_num_map; ++j )
 			W[i][j] += dW[i][j];

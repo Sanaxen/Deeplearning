@@ -105,6 +105,7 @@ Convolutional::Convolutional( int prev_num_map, int prev_num_unit, int prev_ldu,
 	beta_ = 1.0; gamma_ = 1.0;
 	for( int i = 0; i < num_map; ++i ){
 		W.emplace_back(prev_num_map);
+#pragma omp parallel for    // @@@ add
 		for( int j = 0; j < prev_num_map; ++j ){
 			W[i][j] = Mat(this->m, this->n);
 		}
@@ -205,7 +206,8 @@ void Convolutional::init ( std::mt19937& mt )
 	for( int i = 0; i < num_map; ++i ){
 		for( int j = 0; j < prev_num_map; ++j ){
 			for( int k = 0; k < W[i][j].m; ++k )
-				for( int l = 0; l < W[i][j].m; ++l )
+#pragma omp parallel for    // @@@ add
+				for( int l = 0; l < W[i][j].n; ++l )	//@@W[i][j].m -> W[i][j].n
 					W[i][j](k,l) = d_rand(mt);
 		}				
 	}
@@ -231,6 +233,7 @@ std::vector<std::vector<Convolutional::Mat>> Convolutional::calc_gradient ( cons
 	std::vector<std::vector<Mat>> nabla(num_map);
 	for( int i = 0; i < num_map; ++i ){
 		nabla[i] = std::vector<Mat>(prev_num_map);
+#pragma omp parallel for    // @@@ add
 		for( int j = 0; j < prev_num_map; ++j )
 			nabla[i][j] = Mat(W[i][j].m, W[i][j].n);
 	}
@@ -263,8 +266,8 @@ std::vector<std::vector<Convolutional::Mat>> Convolutional::calc_gradient ( cons
 		const int tmp_size = num_unit;
 		const int tmp_offset = 0;
 #endif
-		int l_idx = std::max(0, tmp_offset - m*prev_ldu/2);
-		int r_idx = std::min(num_unit, tmp_offset + tmp_size + m*prev_ldu/2);
+		const int l_idx = std::max(0, tmp_offset - m*prev_ldu/2);
+		const int r_idx = std::min(num_unit, tmp_offset + tmp_size + m*prev_ldu/2);
 		
 #pragma omp parallel
 		{
@@ -488,6 +491,7 @@ void Convolutional::update_W ( const std::vector<std::vector<Mat>>& dW )
 {
 	const double a_beta = 0.9, a_gamma = 0.999, a_eps = 1.0E-8;
 	beta_ *= a_beta; gamma_ *= a_gamma;
+#pragma omp parallel for    // @@@ add
 	for( int i = 0; i < num_map; ++i ){
 		for( int j = 0; j < prev_num_map; ++j )
 			W[i][j] += dW[i][j];
@@ -650,6 +654,7 @@ std::vector<Convolutional::Mat> Convolutional::apply ( const std::vector<Mat>& U
 std::vector<std::vector<Convolutional::Vec>> Convolutional::apply ( const std::vector<std::vector<Vec>>& u, bool use_func )
 {
 	std::vector<Mat> tmp(prev_num_map);
+#pragma omp parallel for    // @@@ add
 	for( int i = 0; i < prev_num_map; ++i )
 		tmp[i] = Mat(u[0][0].size(), u.size());
 
@@ -684,18 +689,16 @@ std::vector<Convolutional::Mat> Convolutional::deconvolution ( const std::vector
 	const int Y = prev_num_unit/prev_ldu, X = prev_ldu;
 	std::vector<Mat> ret(prev_num_map);
 
-	int i, j, k, x, y, s, t;
-#pragma omp parallel for default(none) \
-	private(i,j,k,s,t,y,x) shared(ret, U)
-	for( i = 0; i < prev_num_map; ++i ){
+#pragma omp parallel for           // @@@ add
+	for( int i = 0; i < prev_num_map; ++i ){
 		ret[i] = Mat(prev_num_unit, U[0].n);
-		for( j = 0; j < num_map; ++j ){
+		for( int j = 0; j < num_map; ++j ){
 			auto U_ = (*func)(U[j], false);
-			for( k = 0; k < U[0].n; ++k )
-				for( x = 0; x < X; ++x )
-					for( y = 0; y < Y; ++ y ){
-						for( s = -m/2; s < (m+1)/2; ++s )
-							for( t = -n/2; t < (n+1)/2; ++t ){
+			for( int k = 0; k < U[0].n; ++k )
+				for( int x = 0; x < X; ++x )
+					for( int y = 0; y < Y; ++ y ){
+						for( int s = -m/2; s < (m+1)/2; ++s )
+							for( int t = -n/2; t < (n+1)/2; ++t ){
 								int nx = (x - s),
 									ny = (y - t);
 								if( nx < 0 || nx >= X || ny < 0 || ny >= Y ) continue;
@@ -751,6 +754,19 @@ void Convolutional::set_W ( const std::string& filename )
 					ifs.read((char*)&W[i][j](k,l), sizeof(W[i][j](k,l)));
 				}
 		}
+
+		ifs.read((char*)&is_use_bias, sizeof(is_use_bias));
+		if ( this->is_use_bias )
+		{
+			int sz = 0;
+			ifs.read((char*)&sz, sizeof(int));
+			bias.resize(sz);
+			for ( int i = 0; i < sz; i++ )
+			{
+				ifs.read((char*)&bias[i], sizeof(bias[i]));
+			}
+		}
+
 }
 
 void Convolutional::output_W ( const std::string& filename )
@@ -767,7 +783,19 @@ void Convolutional::output_W ( const std::string& filename )
 				for( int k = 0; k < W[i][j].m; ++k )
 					for( int l = 0; l < W[i][j].n; ++l )
 						ofs.write((char*)&W[i][j](k,l), sizeof(W[i][j](k,l)));
-			}	
+			}
+
+		ofs.write((char*)&is_use_bias, sizeof(is_use_bias));
+		if ( this->is_use_bias )
+		{
+			int sz = this->bias.size();
+			ofs.write((char*)&sz, sizeof(int));
+			for ( int i = 0; i < sz; i++ )
+			{
+				ofs.write((char*)&bias[i], sizeof(bias[i]));
+			}
+		}
+
 #ifdef USE_MPI
 	}
 #endif

@@ -7,8 +7,18 @@
 class BatchNormalize : public Layer
 {
 private:
-	const double EPS = 1.0E-8;
+	bool islearning;	//@@@ add
+	double decay;		//@@@ add
+	double EPS;
 	Mat mean, var;
+	Mat tmp_mean, tmp_var;	//@@@ add
+
+	inline void _init()	//@@@ add
+	{
+		islearning = false;
+		EPS = 1.0E-8;
+		decay = 0.999;	//@@@ add
+	}
 public:
 	BatchNormalize( int prev_num_map, int prev_num_unit,
 					const std::shared_ptr<Function>& f );
@@ -38,6 +48,7 @@ public:
 BatchNormalize::BatchNormalize( int prev_num_map, int prev_num_unit,
 								const std::shared_ptr<Function>& f )
 {
+	_init();	//@@@ add
 	this->prev_num_map = this->num_map = prev_num_map;
 	this->prev_num_unit = this->num_unit = prev_num_unit;
 	func = f;
@@ -87,7 +98,7 @@ void BatchNormalize::init( std::mt19937& m )
 
 void BatchNormalize::finalize ()
 {
-
+	islearning = false;
 }
 
 std::vector<std::vector<BatchNormalize::Mat>> BatchNormalize::calc_gradient ( const std::vector<Mat>& U, const std::vector<Mat>& delta )

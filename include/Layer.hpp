@@ -22,6 +22,7 @@ protected:
 	typedef std::vector<double> Vec;
 
 	bool is_use_bias;
+	bool is_learning;
 
 	int prev_num_map, num_map;
 	int prev_num_unit, num_unit;
@@ -39,7 +40,10 @@ public:
 	double t_delta_init, t_delta_gemm, t_delta_repl, t_delta_comm;
 	double t_grad_init, t_grad_gemm, t_grad_repl, t_grad_comm;
 
-	Layer(){}
+	Layer():is_learning(false){}
+
+	inline void set_is_learning(const bool s) { is_learning = s; }
+
 
 #ifdef USE_MPI
 	virtual void init ( std::mt19937& m, MPI_Comm inner_world, MPI_Comm outer_world ) = 0;

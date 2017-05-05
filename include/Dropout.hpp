@@ -10,7 +10,6 @@ class Dropout : public Layer
 {
 private:
 	double dropout_p;
-	bool islearning;
 
 	std::mt19937 mt;
 	std::uniform_real_distribution<double> d_rand;
@@ -47,7 +46,6 @@ Dropout::Dropout( int prev_num_map, int prev_num_unit, double dropout_p,
 	this->prev_num_map = this->num_map = prev_num_map;
 	this->prev_num_unit = this->num_unit = prev_num_unit;
 	this->dropout_p = dropout_p;
-	this->islearning = false;
 
 	t_apply = t_delta = t_grad = 0.0;
 	t_apply_init = t_apply_gemm = t_apply_repl = 0.0;
@@ -77,7 +75,7 @@ void Dropout::init ( std::mt19937& m )
 #endif
 	mt = std::mt19937(seed);
 
-	islearning = true;
+	is_learning = true;
 	mask = Mat(prev_num_unit, prev_num_map);
 	for( int i = 0; i < prev_num_unit; ++i )
 		for( int j = 0; j < prev_num_map; ++j )
@@ -86,7 +84,7 @@ void Dropout::init ( std::mt19937& m )
 
 void Dropout::finalize ()
 {
-	islearning = false;
+	is_learning = false;
 }
 
 std::vector<std::vector<Dropout::Mat>> Dropout::calc_gradient ( const std::vector<Mat>& U, const std::vector<Mat>& delta )
@@ -121,7 +119,7 @@ std::vector<Dropout::Mat> Dropout::calc_delta ( const std::vector<Mat>& U, const
 #pragma omp for nowait
 			for( int j = 0; j < my_size; ++j ){
 				for( int k = 0; k < delta[i].n; ++k )
-					nx_delta[i](my_offset + j, k) = delta[i](my_offset + j, k) * U_diff(my_offset + j, k) * mask(j, i);
+					nx_delta[i](my_offset + j, k) = delta[i](my_offset + j, k) * U_diff(my_offset + j, k) * mask(my_offset + j, i);
 			}
 		}
 	}
@@ -188,6 +186,8 @@ std::vector<Dropout::Mat> Dropout::apply ( const std::vector<Mat>& U, bool use_f
 	for( int i = 0; i < num_map; ++i )
 		MPI_Allgatherv(&tmp_ret[i](0,0), size[rank], MPI_DOUBLE_PRECISION,
 					   &ret[i](0,0), &size[0], &offset[0], MPI_DOUBLE_PRECISION, inner_world);
+#else
+	ret = tmp_ret;	// @@@ add
 #endif
 	end = std::chrono::system_clock::now();
 	t_apply_gemm += std::chrono::duration_cast<std::chrono::nanoseconds>(end - beg).count()/1e9;
@@ -225,11 +225,20 @@ std::vector<std::vector<Dropout::Vec>> Dropout::apply ( const std::vector<std::v
 
 void Dropout::set_W ( const std::string& filename )
 {
+	std::ifstream ifs(filename, std::ios::binary);
+
+	for( int i = 0; i < prev_num_unit; ++i )
+		for( int j = 0; j < prev_num_map; ++j )
+			ifs.read((char*)&mask(i,j), sizeof(mask(i,j)));
 	
 }
 
 void Dropout::output_W ( const std::string& filename )
 {
+	std::ofstream ofs(filename, std::ios::binary);
+	for( int i = 0; i < prev_num_unit; ++i )
+		for( int j = 0; j < prev_num_map; ++j )
+			ofs.write((char*)&mask(i,j), sizeof(mask(i,j)));
 	
 }
 

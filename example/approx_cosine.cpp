@@ -25,8 +25,13 @@ int main()
 	// set input values and supervised values.
 	vector<vector<vector<double>>> x(100), y(100);
 	for( int i = 0; i < 100; ++i ){
-		x[i] = {{-1.0 + 2.0/99.0*i}};
-		y[i] = {{cos(x[i][0][0])}};
+		x[i].resize(1);
+		x[i][0].resize(1);
+		y[i].resize(1);
+		y[i][0].resize(1);
+
+		x[i][0][0] = -1.0 + 2.0/99.0*i;
+		y[i][0][0] = cos(x[i][0][0]);
 	}
 	
 	// set a hyper parameter.
@@ -37,7 +42,10 @@ int main()
 	net.learning(x, y, 100/10*10);
 	
 	// check approximated function by neuralnet.
-	vector<vector<vector<double>>> input = {{{0.8}}};
+	vector<vector<vector<double>>> input(1);
+	input[0].resize(1);
+	input[0][0].resize(1);
+	input[0][0][0] = 0.8;
 	auto output = net.apply(input);
 	printf("Approximation : %.6E\n", output[0][0][0]);
 	printf("Correct       : %.6E\n", cos(input[0][0][0]));

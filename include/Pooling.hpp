@@ -141,7 +141,7 @@ std::vector<Pooling::Mat> Pooling::calc_delta ( const std::vector<Mat>& U, const
 		const int gap = prev_ldu + 2*pad;
 #pragma omp parallel for
 		for( int j = 0; j < my_size; ++j ){
-			int x = (j + my_offset)%ldu, y = (j + my_offset)/ldu;
+			const int x = (j + my_offset)%ldu, y = (j + my_offset)/ldu;
 
 			for( int k = 0; k < U_apply.n; ++k ){
 				int s_idx = -1;
@@ -149,8 +149,8 @@ std::vector<Pooling::Mat> Pooling::calc_delta ( const std::vector<Mat>& U, const
 				
 				for( int s = 0; s < m; ++s )
 					for( int t = 0; t < n; ++t ){
-						int idx = stride*x + t + s*gap + stride*y*gap;
-						int nx = idx%gap - pad, ny = idx/gap - pad;
+						const int idx = stride*x + t + s*gap + stride*y*gap;
+						const int nx = idx%gap - pad, ny = idx/gap - pad;
 
 						if( nx < 0 || nx >= X || ny < 0 || ny >= Y ) continue;
 
@@ -216,7 +216,7 @@ std::vector<Pooling::Mat> Pooling::apply ( const std::vector<Mat>& U, bool use_f
 		const int gap = prev_ldu + 2*pad;
 #pragma omp parallel for
 		for( int j = 0; j < my_size; ++j ){
-			int x = (j + my_offset)%ldu, y = (j + my_offset)/ldu;
+			const int x = (j + my_offset)%ldu, y = (j + my_offset)/ldu;
 
 			for( int k = 0; k < U_.n; ++k ){
 				int s_idx = -1;
@@ -224,8 +224,8 @@ std::vector<Pooling::Mat> Pooling::apply ( const std::vector<Mat>& U, bool use_f
 
 				for( int s = 0; s < m; ++s )
 					for( int t = 0; t < n; ++t ){
-						int idx = stride*x + t + s*gap + stride*y*gap;
-						int nx = idx%gap - pad, ny = idx/gap - pad;
+						const int idx = stride*x + t + s*gap + stride*y*gap;
+						const int nx = idx%gap - pad, ny = idx/gap - pad;
 						
 						if( nx < 0 || nx >= X || ny < 0 || ny >= Y ) continue;
 
@@ -293,14 +293,13 @@ std::vector<Pooling::Mat> Pooling::unpooling ( const std::vector<Mat>& U )
 	const int Y = prev_num_unit/prev_ldu, X = prev_ldu;
 	std::vector<Mat> ret(num_map);
 
-	int i,j,k,y,x;
-#pragma omp parallel for default(none) \
-	private(i,j,y,x) shared(ret, U)
-	for( i = 0; i < num_map; ++i ){
+//@@
+#pragma omp parallel for
+	for( int i = 0; i < num_map; ++i ){
 		ret[i] = Mat(prev_num_unit, U[0].n);
-		for( j = 0; j < U[0].n; ++j ){
-			for( y = 0; y < Y; y += stride )
-				for( x = 0; x < X; x += stride ){
+		for( int j = 0; j < U[0].n; ++j ){
+			for( int y = 0; y < Y; y += stride )
+				for( int x = 0; x < X; x += stride ){
 					int idx = S[i](x/stride + (y/stride)*ldu, j);
 					double val = U[i](x+prev_ldu*y,j);
 
