@@ -198,8 +198,27 @@ void Convolutional::init ( std::mt19937& mt )
 		}
 	}
 
-	const double r = sqrt(6.0/(num_unit + prev_num_unit));
-	std::normal_distribution<float> d_rand(0.0, 1.0E-1);
+	//const double r = sqrt(6.0/(num_unit + prev_num_unit));
+	//std::normal_distribution<double> d_rand(0.0, 1.0E-1);
+
+	//const double r = sqrt(prev_num_map*m*n);
+	//std::normal_distribution<double> d_rand(-1.0/r, 1.0/r);
+
+	//std::normal_distribution<double> d_rand(-0.01, 0.01);
+
+	//std::normal_distribution<double> d_rand(-0.1, 0.1);
+
+	//std::normal_distribution<double> d_rand(0.0, 0.01);
+	//std::normal_distribution<double> d_rand(0.0, 0.001);
+
+	double up = 0.1;
+	double low = 0.0;
+	if (!this->initial_value_range_default)
+	{
+		low = this->initial_value_range[0];
+		up  = this->initial_value_range[1];
+	}
+	std::normal_distribution<double> d_rand(low, up);
 
 	bias = Vec(num_map, 0.0); d_bias = Vec(num_map, 0.0);
 	this->r = Vec(num_map, 0.0); v = Vec(num_map, 0.0);

@@ -82,7 +82,17 @@ void SparseFullyConnected::init ( std::mt19937& m )
 	}
 	
 	const double r = sqrt(6.0/(prev_num_unit + num_unit));
-	std::uniform_real_distribution<double> d_rand(-r, r);
+	//std::uniform_real_distribution<double> d_rand(-r, r);
+
+	double low = -r;
+	double up = r;
+	if (!this->initial_value_range_default)
+	{
+		low = this->initial_value_range[0];
+		up  = this->initial_value_range[1];
+	}
+	std::normal_distribution<double> d_rand(low, up);
+
 	rho = Mat::ones(num_unit, num_map);
 	for( int i = 0; i < num_map; ++i ){
 		for( int j = 0; j < prev_num_map; ++j ){

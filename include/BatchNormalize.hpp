@@ -90,7 +90,16 @@ void BatchNormalize::init( std::mt19937& m )
 	mean = Mat(num_map, my_size);
 	var = Mat(num_map, my_size);
 
-	std::uniform_real_distribution<double> d_rand(-1.0, 1.0);
+	//std::uniform_real_distribution<double> d_rand(-1.0, 1.0);
+	double low = -1.0;
+	double up = 1.0;
+	if (!this->initial_value_range_default)
+	{
+		low = this->initial_value_range[0];
+		up  = this->initial_value_range[1];
+	}
+	std::normal_distribution<double> d_rand(low, up);
+
 	for( int i = 0; i < num_map; ++i ){
 		W[0][i](0,0) = d_rand(m); W[0][i](0,1) = d_rand(m);
 	}
