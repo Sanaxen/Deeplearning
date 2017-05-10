@@ -89,8 +89,9 @@ void FullyConnected::init ( std::mt19937& m )
 	{
 		low = this->initial_value_range[0];
 		up = this->initial_value_range[1];
+		printf("FullyConnected initial_value_range %f <-> %f\n", low, up);
 	}
-	std::normal_distribution<double> d_rand(low, up);
+	std::uniform_real_distribution<double> d_rand(low, up);
 
 	for( int i = 0; i < num_map; ++i ){
 		for( int j = 0; j < prev_num_map; ++j ){

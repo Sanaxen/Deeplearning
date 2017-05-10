@@ -98,7 +98,8 @@ void BatchNormalize::init( std::mt19937& m )
 		low = this->initial_value_range[0];
 		up  = this->initial_value_range[1];
 	}
-	std::normal_distribution<double> d_rand(low, up);
+	//std::normal_distribution<double> d_rand(low, up);
+	std::uniform_real_distribution<double> d_rand(low, up);
 
 	for( int i = 0; i < num_map; ++i ){
 		W[0][i](0,0) = d_rand(m); W[0][i](0,1) = d_rand(m);

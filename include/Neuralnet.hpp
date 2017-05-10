@@ -1,5 +1,6 @@
 #ifndef NEURALNET_HPP
 #define NEURALNET_HPP
+#pragma warning(disable : 4267)
 
 #include <fstream>
 #include <string>

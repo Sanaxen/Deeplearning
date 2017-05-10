@@ -201,13 +201,6 @@ void Convolutional::init ( std::mt19937& mt )
 	//const double r = sqrt(6.0/(num_unit + prev_num_unit));
 	//std::normal_distribution<double> d_rand(0.0, 1.0E-1);
 
-	//const double r = sqrt(prev_num_map*m*n);
-	//std::normal_distribution<double> d_rand(-1.0/r, 1.0/r);
-
-	//std::normal_distribution<double> d_rand(-0.01, 0.01);
-
-	//std::normal_distribution<double> d_rand(-0.1, 0.1);
-
 	//std::normal_distribution<double> d_rand(0.0, 0.01);
 	//std::normal_distribution<double> d_rand(0.0, 0.001);
 
