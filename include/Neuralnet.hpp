@@ -606,7 +606,7 @@ void Neuralnet::print_cost ( const std::vector<Mat>& x, const std::vector<Mat>& 
 {
 	double error[3] = { 0.0 }, min_err = 1.0E100, max_err = 0.0;
 	auto v = apply(x);
-	for( int i = 0; i < x.size(); ++i ){
+	for( int i = 0; i < y.size(); ++i ){	// @@  refer to i with y (y[i]) -> x.size()->y.size()
 		for( int j = 0; j < x[i].n; ++j ){
 			Mat v_(v[i].m, 1), y_(y[i].m, 1);
 			for( int k = 0; k < v[i].m; ++k ){
@@ -623,7 +623,7 @@ void Neuralnet::print_cost ( const std::vector<Mat>& x, const std::vector<Mat>& 
 	error[0] /= x[0].n;
 
 	for( int i = 0; i < layer.size(); ++i ){
-		auto W = layer[i]->get_W();
+		const auto& W = layer[i]->get_W();
 		for( int j = 0; j < W.size(); ++j )
 			for( int k = 0; k < W[j].size(); ++k )
 				for( int l = 0; l < W[j][k].m; ++l )
@@ -677,7 +677,7 @@ void Neuralnet::print_weight () const
 		double min_weight = 1.0E100;
 
 		int num = 0;
-		auto W = layer[i]->get_W();
+		const auto& W = layer[i]->get_W();
 		for( int j = 0; j < W.size(); ++j ){
 			for( int k = 0; k < W[j].size(); ++k ){
 				for( int l = 0; l < W[j][k].m; ++l )
@@ -716,7 +716,7 @@ void Neuralnet::print_gradient () const
 		double min_gradient = 1.0E100;
 
 		int num = 0;
-		auto W = layer[i]->get_W();
+		const auto& W = layer[i]->get_W();
 		for( int j = 0; j < W.size(); ++j ){
 			for( int k = 0; k < W[j].size(); ++k ){
 				for( int l = 0; l < W[j][k].m; ++l )
